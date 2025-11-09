@@ -1,121 +1,594 @@
 <!doctype html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>محرك TinyGameLang</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>محرّك TinyGameLang — محرر + PixiJS</title>
+
+  <!-- Tailwind via CDN (سهل للتجربة السريعة) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
   <style>
-    body {
-      font-family: sans-serif;
-      background: #f7f7f7;
-      margin: 0;
-      padding: 1em;
-      direction: rtl;
-    }
-    .container {max-width: 1000px; margin:auto; display:grid; grid-template-columns:1fr 1fr; gap:1em;}
-    textarea {width:100%; height:300px; font-family:monospace; font-size:14px;}
-    button {padding:6px 16px; margin-top:6px;}
-    iframe {width:100%; height:300px; border:1px solid #ccc; border-radius:8px;}
-    pre {background:#000; color:#0f0; padding:8px; height:100px; overflow:auto;}
+    /* تحسين مظهر Font و scrollbar بسيط */
+    body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
+    .cm-editor { height: 320px; border-radius: .5rem; overflow: hidden; }
+    /* محاكاة بسيطة للـ editor container لو احتجت fallback */
+    #examples { max-height: 10rem; overflow:auto; }
   </style>
 </head>
-<body>
-  <h1>🎮 محرك الألعاب TinyGameLang</h1>
-  <div class="container">
-    <div>
-      <label>الكود:</label>
-      <textarea id="code">// مثال
-player at 50 50
-color player red
-rect player 20 20
-loop 60
-  move player 2 0
-end</textarea>
-      <br/>
-      <button id="run">تشغيل</button>
-    </div>
-    <div>
-      <label>المعاينة:</label>
-      <iframe id="preview"></iframe>
-      <pre id="console">—</pre>
-    </div>
+<body class="bg-gray-50 min-h-screen p-6">
+
+  <div class="max-w-6xl mx-auto">
+    <header class="mb-6">
+      <h1 class="text-2xl font-bold">🎮 محرّك TinyGameLang — محرر + عرض (PixiJS)</h1>
+      <p class="text-sm text-gray-600">نسخة موسعة: محرر CodeMirror 6 + PixiJS + حفظ تلقائي + تصدير/استيراد أمثلة.</p>
+    </header>
+
+    <main class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- المحرر والخيارات -->
+      <section class="space-y-4">
+        <div class="bg-white p-4 rounded-2xl shadow">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h2 class="font-semibold">المحرر</h2>
+              <p class="text-xs text-gray-500">اكتب كود TinyGameLang ثم اضغط Run</p>
+            </div>
+
+            <div class="flex gap-2">
+              <button id="runBtn" class="px-3 py-1 bg-green-600 text-white rounded">تشغيل</button>
+              <button id="stopBtn" class="px-3 py-1 bg-red-500 text-white rounded">إيقاف</button>
+              <button id="saveBtn" class="px-3 py-1 bg-blue-600 text-white rounded">حفظ يدوي</button>
+              <button id="downloadBtn" class="px-3 py-1 bg-gray-200 rounded">تنزيل .tiny</button>
+              <label class="cursor-pointer px-3 py-1 bg-gray-200 rounded">
+                تحميل
+                <input id="uploadFile" type="file" accept=".tiny,.txt" class="hidden" />
+              </label>
+            </div>
+          </div>
+
+          <div id="editor" class="mt-3 cm-editor border border-gray-200"></div>
+
+          <div class="mt-3 flex gap-2 items-center">
+            <select id="examples" class="px-3 py-1 rounded border">
+              <option value="">— اختر مثالاً —</option>
+              <option value="basic">مثال: حركة بسيطة</option>
+              <option value="background">مثال: خلفية ونص</option>
+              <option value="circle">مثال: دائرة متحركة</option>
+            </select>
+            <button id="loadExample" class="px-3 py-1 bg-indigo-600 text-white rounded">تحميل المثال</button>
+
+            <div class="mr-auto text-sm text-gray-500">الحفظ التلقائي يعمل كل 5 ثواني.</div>
+          </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl shadow">
+          <h3 class="font-medium">مخرجات / Console</h3>
+          <pre id="console" class="mt-2 bg-black text-green-300 p-3 rounded h-28 overflow-auto">—</pre>
+          <div class="mt-3 text-xs text-gray-500">أخطاء زمن التشغيل والرسائل ستظهر هنا.</div>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl shadow">
+          <h3 class="font-medium">قواعد مختصرة للـ TinyGameLang</h3>
+          <ul class="list-disc pr-5 mt-2 text-sm leading-7">
+            <li><code>player at X Y</code> — ضع اللاعب عند الإحداثيات</li>
+            <li><code>color player NAME</code> — لون اللاعب (اسم أو #hex)</li>
+            <li><code>rect player W H</code> — حجم المستطيل</li>
+            <li><code>circle player R</code> — اعمل اللاعب دائرة بنصف القطر</li>
+            <li><code>move player DX DY</code> — تحريك اللاعب (مباشر داخل الحلقة)</li>
+            <li><code>loop N ... end</code> — كرر الأوامر داخل الحلقة N مرة</li>
+            <li><code>background COLOR</code> — غيّر لون الخلفية</li>
+            <li><code>say \"text\"</code> — عرض نص (كنص Pixi)</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- المعاينة والخيارات البصرية -->
+      <section class="space-y-4">
+        <div class="bg-white p-4 rounded-2xl shadow">
+          <div class="flex items-center justify-between">
+            <h2 class="font-semibold">المعاينة (PixiJS)</h2>
+            <div class="flex gap-2 items-center">
+              <label class="flex items-center gap-2 text-sm">
+                حجم العرض
+                <select id="sizeSelect" class="px-2 py-1 rounded border">
+                  <option value="480x320">480×320</option>
+                  <option value="640x360">640×360</option>
+                  <option value="800x450">800×450</option>
+                </select>
+              </label>
+              <label class="flex items-center gap-2 text-sm">
+                FPS:
+                <span id="fps" class="ml-2 text-xs text-gray-500">—</span>
+              </label>
+            </div>
+          </div>
+
+          <div id="stageWrap" class="mt-3 border border-gray-200 rounded overflow-hidden" style="background:#ffffff">
+            <!-- PIXI will attach here -->
+            <div id="pixiContainer" style="width:100%;height:320px"></div>
+          </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl shadow">
+          <h3 class="font-medium">خيارات متقدمة</h3>
+          <div class="mt-3 grid grid-cols-2 gap-3">
+            <label class="flex items-center gap-2"><input id="autoSaveToggle" type="checkbox" checked/> حفظ تلقائي</label>
+            <label class="flex items-center gap-2">سرعة التنفيذ: <input id="speedRange" type="range" min="1" max="4" value="1" step="0.1" /></label>
+            <label class="flex items-center gap-2">تصفير الكونسول <button id="clearConsole" class="px-2 py-1 bg-gray-200 rounded">مسح</button></label>
+            <div></div>
+          </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl shadow text-sm text-gray-600">
+          <strong>ملاحظة نشر:</strong> الملف واحد جاهز للرفع على GitHub Pages. بعد رفعه إلى
+          مستودع، فعّل Pages (الفرع: main، المصدر: /) وستجد الموقع على:
+          <code class="block">https://username.github.io/your-repo-name/</code>
+        </div>
+      </section>
+    </main>
   </div>
 
-  <script>
-    function compileTinyGameLang(src) {
-      const lines = src.split(/\\r?\\n/).map(l => l.trim());
-      const out = [];
-      out.push(`(function(runtime){`);
-      out.push(`const p = runtime.player;`);
-      let i=0;
-      while(i<lines.length){
-        const line = lines[i++];
-        if(!line || line.startsWith('//')) continue;
-        const parts=line.split(/\\s+/);
-        if(parts[0]==='player' && parts[1]==='at'){
-          out.push(`p.x=${+parts[2]}; p.y=${+parts[3]};`);
-        } else if(parts[0]==='color' && parts[1]==='player'){
-          out.push(`p.color='${parts[2]}';`);
-        } else if(parts[0]==='rect' && parts[1]==='player'){
-          out.push(`p.w=${+parts[2]}; p.h=${+parts[3]};`);
-        } else if(parts[0]==='move' && parts[1]==='player'){
-          out.push(`p.x+=${+parts[2]}; p.y+=${+parts[3]};`);
-        } else if(parts[0]==='loop'){
-          const n=+parts[1]||1; out.push(`for(let __i=0;__i<${n};__i++){`);
-        } else if(parts[0]==='end'){
-          out.push(`}`);
-        }
-      }
-      out.push(`runtime.draw();`);
-      out.push(`})(window.__TinyRuntime);`);
-      return out.join('\\n');
-    }
+  <!-- PixiJS (Classic UMD) -->
+  <script src="https://pixijs.download/release/pixi.min.js"></script>
 
-    function buildRuntimeHtml(compiledJs){
-      return `<!doctype html>
-<html><body style='margin:0;overflow:hidden'>
-<canvas id='screen' width='480' height='320'></canvas>
-<script>
-window.__TinyRuntime={
-  player:{x:0,y:0,w:16,h:16,color:'black'},
-  ctx:document.getElementById('screen').getContext('2d'),
-  draw:function(){
-    const ctx=this.ctx;
-    ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
-    ctx.fillStyle=this.player.color;
-    ctx.fillRect(this.player.x,this.player.y,this.player.w,this.player.h);
-  }
-};
-try{${compiledJs}}catch(e){
-  parent.postMessage({type:'runtime-error',message:e.message},'*');
-}
-parent.postMessage({type:'runtime-done'},'*');
-<\/script></body></html>`;
-    }
+  <!-- CodeMirror 6 (ES Modules) - basic parts to run an editor -->
+  <script type="module">
+    import { EditorState } from "https://cdn.jsdelivr.net/npm/@codemirror/state@6.3.1/+esm";
+    import { EditorView, minimalSetup } from "https://cdn.jsdelivr.net/npm/@codemirror/basic-setup@0.19.1/+esm";
+    import { defaultHighlightStyle } from "https://cdn.jsdelivr.net/npm/@codemirror/highlight@0.19.6/+esm";
 
-    const runBtn = document.getElementById('run');
-    const codeEl = document.getElementById('code');
-    const preview = document.getElementById('preview');
-    const consoleOut = document.getElementById('console');
+    // إعداد المحرر
+    const startCode = `// مثال موسّع: TinyGameLang
+background #222
+player at 50 140
+color player cyan
+rect player 24 24
+say "مرحباً!"
+loop 120
+  move player 2 0
+end
+`;
 
-    runBtn.onclick = () => {
-      consoleOut.textContent = '';
-      try {
-        const compiled = compileTinyGameLang(codeEl.value);
-        const html = buildRuntimeHtml(compiled);
-        const blob = new Blob([html], {type:'text/html'});
-        preview.src = URL.createObjectURL(blob);
-      } catch (e){
-        consoleOut.textContent = 'خطأ في الترجمة: ' + e.message;
+    const editorParent = document.getElementById('editor');
+    const state = EditorState.create({
+      doc: localStorage.getItem('tiny.code') || startCode,
+      extensions: [
+        minimalSetup,
+        defaultHighlightStyle,
+        EditorView.lineWrapping
+      ]
+    });
+    const view = new EditorView({
+      state,
+      parent: editorParent
+    });
+
+    // واجهة تفاعل مع بقية السكربت
+    window.__TinyEditor = {
+      getCode: () => view.state.doc.toString(),
+      setCode: (text) => {
+        view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
       }
     };
+  </script>
 
-    window.addEventListener('message', e=>{
-      if(e.data.type==='runtime-error')
-        consoleOut.textContent += '\\nRuntime: '+e.data.message;
-      if(e.data.type==='runtime-done')
-        consoleOut.textContent += '\\nانتهى';
+  <!-- Runtime + Compiler TinyGameLang -->
+  <script>
+    // إعداد عناصر DOM
+    const runBtn = document.getElementById('runBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const uploadFile = document.getElementById('uploadFile');
+    const loadExampleBtn = document.getElementById('loadExample');
+    const examplesSelect = document.getElementById('examples');
+    const consoleEl = document.getElementById('console');
+    const autoSaveToggle = document.getElementById('autoSaveToggle');
+    const sizeSelect = document.getElementById('sizeSelect');
+    const pixiContainer = document.getElementById('pixiContainer');
+    const fpsEl = document.getElementById('fps');
+    const clearConsoleBtn = document.getElementById('clearConsole');
+    const speedRange = document.getElementById('speedRange');
+
+    // حالة التطبيق
+    let app = null;
+    let tickerHandle = null;
+    let runtimeState = { running: false, fps: 0, speed: 1 };
+
+    // أدوات مساعدة
+    function logConsole(msg) {
+      consoleEl.textContent += msg + '\\n';
+      consoleEl.scrollTop = consoleEl.scrollHeight;
+    }
+    function clearConsole() { consoleEl.textContent = ''; }
+
+    // أمثلة جاهزة
+    const examples = {
+      basic: `// حركة بسيطة
+background #111
+player at 50 140
+color player orange
+rect player 24 24
+loop 200
+  move player 3 0
+end
+`,
+      background: `background blue
+player at 20 40
+color player white
+rect player 24 24
+say "خلفية زرقاء"
+loop 120
+  move player 2 0
+end
+`,
+      circle: `background #0b0b0b
+player at 100 150
+color player #f0f
+circle player 16
+loop 180
+  move player 2 0
+end
+`
+    };
+
+    // تحميل مثال
+    loadExampleBtn.addEventListener('click', () => {
+      const key = examplesSelect.value;
+      if (!key) return alert('اختر مثالاً');
+      window.__TinyEditor.setCode(examples[key] || '');
     });
+
+    // حفظ/تحميل محلي
+    saveBtn.addEventListener('click', () => {
+      const code = window.__TinyEditor.getCode();
+      localStorage.setItem('tiny.code', code);
+      logConsole('تم الحفظ محلياً');
+    });
+
+    // تحميل ملف .tiny
+    uploadFile.addEventListener('change', (ev) => {
+      const f = ev.target.files && ev.target.files[0];
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        window.__TinyEditor.setCode(String(reader.result));
+      };
+      reader.readAsText(f);
+    });
+
+    // تنزيل الملف
+    downloadBtn.addEventListener('click', () => {
+      const code = window.__TinyEditor.getCode();
+      const blob = new Blob([code], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'project.tiny';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    // حفظ تلقائي كل 5 ثواني إذا مفعل
+    setInterval(() => {
+      if (autoSaveToggle.checked) {
+        const code = window.__TinyEditor.getCode();
+        localStorage.setItem('tiny.code', code);
+        // لا نطبع في الكونسول كل مرة لتجنب الفوضى
+      }
+    }, 5000);
+
+    // مسح الكونسول
+    clearConsoleBtn.addEventListener('click', clearConsole);
+
+    // تغيير حجم العرض
+    sizeSelect.addEventListener('change', () => {
+      const v = sizeSelect.value.split('x');
+      resizeStage(parseInt(v[0]), parseInt(v[1]));
+    });
+
+    // سرعة التنفيذ (معدل حركة)
+    speedRange.addEventListener('input', () => {
+      runtimeState.speed = Number(speedRange.value);
+    });
+
+    // إيقاف التشغيل
+    stopBtn.addEventListener('click', stopRuntime);
+
+    // تشغيل
+    runBtn.addEventListener('click', () => {
+      stopRuntime(); // أوقف أي شيء شغال سابقاً
+      clearConsole();
+      const code = window.__TinyEditor.getCode();
+      try {
+        startRuntime(code);
+      } catch (e) {
+        logConsole('خطأ: ' + e.message);
+      }
+    });
+
+    // =========================
+    // TinyGameLang Compiler (مترجم بسيط ينتج AST داخلي)
+    // =========================
+    function parseTiny(src) {
+      // نعيد مصفوفة أوامر بسيطة (AST خفيف)
+      const lines = src.split(/\\r?\\n/);
+      const cmds = [];
+      const stack = [];
+      for (let rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line || line.startsWith('//')) continue;
+        // quotes handling for say "text"
+        const sayMatch = line.match(/^say\\s+"(.*)"$/i);
+        if (sayMatch) {
+          cmds.push({ t: 'say', text: sayMatch[1] });
+          continue;
+        }
+        const parts = line.split(/\\s+/);
+        const first = parts[0].toLowerCase();
+
+        if (first === 'loop') {
+          const n = Number(parts[1]) || 0;
+          const node = { t: 'loop', n, body: [] };
+          cmds.push(node);
+          stack.push(node);
+          continue;
+        }
+        if (first === 'end') {
+          stack.pop();
+          continue;
+        }
+
+        const node = (() => {
+          // handle background
+          if (first === 'background') return { t: 'background', color: parts[1] };
+          if (first === 'player' && parts[1] === 'at') return { t: 'player_at', x: Number(parts[2]), y: Number(parts[3]) };
+          if (first === 'color' && parts[1] === 'player') return { t: 'color_player', color: parts[2] };
+          if (first === 'rect' && parts[1] === 'player') return { t: 'rect_player', w: Number(parts[2]), h: Number(parts[3]) };
+          if (first === 'circle' && parts[1] === 'player') return { t: 'circle_player', r: Number(parts[2]) };
+          if (first === 'move' && parts[1] === 'player') return { t: 'move_player', dx: Number(parts[2]), dy: Number(parts[3]) };
+          // fallback unknown
+          return { t: 'unknown', raw: line };
+        })();
+
+        if (stack.length > 0) {
+          stack[stack.length - 1].body.push(node);
+        } else {
+          cmds.push(node);
+        }
+      }
+      return cmds;
+    }
+
+    // =========================
+    // Runtime using PixiJS
+    // =========================
+    function createPixiApp(width = 480, height = 320) {
+      // نظيفة إذا كان قائم
+      if (app) {
+        app.destroy(true, { children: true });
+        app = null;
+      }
+      // Create Pixi Application
+      app = new PIXI.Application({
+        width, height,
+        backgroundColor: 0x000000,
+        resolution: window.devicePixelRatio || 1,
+        autoDensity: true
+      });
+      // Attach
+      pixiContainer.innerHTML = '';
+      pixiContainer.appendChild(app.view);
+      return app;
+    }
+
+    function resizeStage(w, h) {
+      if (!app) {
+        createPixiApp(w, h);
+      } else {
+        app.renderer.resize(w, h);
+      }
+      app.renderer.view.style.width = '100%';
+      app.renderer.view.style.height = '320px';
+    }
+
+    // Convert color string to hex for Pixi
+    function colorToHex(c) {
+      if (!c) return 0xffffff;
+      // handle #hex
+      if (c.startsWith('#')) return parseInt(c.slice(1), 16);
+      // simple names — a minimal map
+      const map = {
+        red: 0xff0000, green: 0x00ff00, blue: 0x0000ff, white: 0xffffff, black: 0x000000,
+        cyan: 0x00ffff, orange: 0xffa500, yellow: 0xffff00, magenta: 0xff00ff, gray: 0x808080
+      };
+      if (map[c.toLowerCase()]) return map[c.toLowerCase()];
+      // fallback white
+      return 0xffffff;
+    }
+
+    // flatten commands into a sequence of frames (simple execution model)
+    function flattenCommands(cmds) {
+      // We'll produce an array of frame-actions: each frame is a list of ops
+      // loop N will duplicate its body N times
+      const frames = [];
+      function pushOps(list) {
+        for (const node of list) {
+          if (node.t === 'loop') {
+            for (let i = 0; i < node.n; i++) {
+              pushOps(node.body);
+            }
+          } else {
+            frames.push(node);
+          }
+        }
+      }
+      pushOps(cmds);
+      return frames;
+    }
+
+    function startRuntime(code) {
+      // Parse
+      const ast = parseTiny(code);
+      // initial stage size
+      const size = sizeSelect.value.split('x').map(Number);
+      createPixiApp(size[0], size[1]);
+      const stage = app.stage;
+      // stateful objects
+      const player = {
+        g: new PIXI.Graphics(),
+        x: 0, y: 0, w: 24, h: 24, r: null, color: 0xffffff, text: null
+      };
+      stage.addChild(player.g);
+
+      // background
+      let bgColor = 0x000000;
+      app.renderer.backgroundColor = bgColor;
+
+      // text objects
+      const texts = [];
+
+      // flatten into frames
+      const frames = flattenCommands(ast);
+
+      // pointer to frame index
+      let pc = 0;
+
+      function applyNode(node) {
+        switch (node.t) {
+          case 'background':
+            bgColor = colorToHex(node.color);
+            app.renderer.backgroundColor = bgColor;
+            break;
+          case 'player_at':
+            player.x = node.x;
+            player.y = node.y;
+            break;
+          case 'color_player':
+            player.color = colorToHex(node.color);
+            break;
+          case 'rect_player':
+            player.w = node.w || player.w;
+            player.h = node.h || player.h;
+            player.r = null;
+            break;
+          case 'circle_player':
+            player.r = node.r || player.r;
+            if (player.r) { player.w = player.h = player.r * 2; }
+            break;
+          case 'move_player':
+            player.x += node.dx * runtimeState.speed;
+            player.y += node.dy * runtimeState.speed;
+            break;
+          case 'say':
+            // create a PIXI.Text and place it above player
+            const t = new PIXI.Text(node.text, { fontSize: 16, fill: 0xffffff });
+            t.x = player.x;
+            t.y = player.y - 30;
+            stage.addChild(t);
+            texts.push({ obj: t, ttl: 120 }); // live 120 frames
+            break;
+          case 'unknown':
+            logConsole('تعذر تنفيذ السطر: ' + node.raw);
+            break;
+        }
+      }
+
+      // initial pass: apply non-motion nodes that set initial state until first move or so
+      // but our frames array is sequential; we'll just play it: each frame triggers applyNode
+      runtimeState.running = true;
+
+      // ticker for animation
+      let last = performance.now();
+      let frameCount = 0;
+      let fpsTime = 0;
+
+      app.ticker.maxFPS = 60;
+      app.ticker.add(() => {
+        if (!runtimeState.running) return;
+        const now = performance.now();
+        const dt = now - last;
+        last = now;
+
+        // execute a chunk: to keep UI responsive we execute some nodes per tick
+        // execute up to 2 nodes per tick scaled by speed
+        const perTick = Math.max(1, Math.round(1 * runtimeState.speed));
+        for (let k = 0; k < perTick; k++) {
+          if (pc >= frames.length) break;
+          const node = frames[pc++];
+          applyNode(node);
+        }
+
+        // update player graphics
+        player.g.clear();
+        player.g.beginFill(player.color || 0xffffff);
+        if (player.r) {
+          player.g.drawCircle(player.x + player.r, player.y + player.r, player.r);
+        } else {
+          player.g.drawRect(player.x, player.y, player.w, player.h);
+        }
+        player.g.endFill();
+
+        // update texts lifetime
+        for (let i = texts.length - 1; i >= 0; i--) {
+          texts[i].ttl--;
+          const t = texts[i].obj;
+          if (t) {
+            t.x = player.x;
+            t.y = player.y - 30;
+          }
+          if (texts[i].ttl <= 0) {
+            stage.removeChild(texts[i].obj);
+            texts.splice(i, 1);
+          }
+        }
+
+        // if reached end, stop
+        if (pc >= frames.length) {
+          runtimeState.running = false;
+          logConsole('انتهت التعليمات');
+        }
+
+        // FPS display (low-cost)
+        frameCount++;
+        fpsTime += dt;
+        if (fpsTime >= 500) {
+          const fps = Math.round((frameCount / fpsTime) * 1000);
+          fpsEl.textContent = fps + ' fps';
+          frameCount = 0;
+          fpsTime = 0;
+        }
+      });
+
+      logConsole('بدء التشغيل — ' + frames.length + ' عملية');
+      // store runtime in global for stop
+      runtimeState._pc = pc;
+      runtimeState._frames = frames;
+      runtimeState._player = player;
+      runtimeState._texts = texts;
+    }
+
+    function stopRuntime() {
+      runtimeState.running = false;
+      if (app) {
+        app.ticker.stop();
+        // keep the stage visible but stop changes
+      }
+      logConsole('أُوقف التنفيذ');
+    }
+
+    // عند تحميل الصفحة: احمل الكود من LocalStorage (تمّت بالفعل داخل CodeMirror init)
+    logConsole('جاهز — عدّل الكود واضغط تشغيل');
+
+    // اختياري: افتح مثال افتراضي عندما لا يوجد كود مخزن
+    (function ensureInitial() {
+      if (!localStorage.getItem('tiny.code')) {
+        window.__TinyEditor.setCode(document.querySelector('#editor').textContent || '');
+        // لم необходимости: نترك الكود الافتراضي المضمن في Editor init
+      }
+    })();
   </script>
 </body>
 </html>
