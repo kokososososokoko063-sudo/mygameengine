@@ -5,468 +5,178 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>TinyGameLang — محرر + PixiJS (CodeMirror 5)</title>
 
-  <!-- Tailwind (CDN) -->
+  <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- CodeMirror 5 (CSS + JS) -->
+  <!-- CodeMirror 5 -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/eclipse.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
-  <!-- Optional simple modes for highlighting -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/javascript/javascript.min.js"></script>
 
-  <!-- PixiJS -->
-  <script src="https://pixijs.download/release/pixi.min.js"></script>
+  <!-- PixiJS v6.5.8 (stable) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/6.5.8/browser/pixi.min.js"></script>
 
   <style>
-    body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
-    .cm-wrap { height:320px; border-radius:.5rem; overflow:hidden; border:1px solid #e5e7eb; }
-    .codemirror { height:320px; }
-    pre.console { background:#000; color:#9be15d; padding:10px; height:140px; overflow:auto; border-radius:.5rem; }
-    /* ensure pixi canvas is responsive in container */
+    body { font-family: sans-serif; }
+    .cm-wrap { height:320px; border:1px solid #ddd; border-radius:.5rem; overflow:hidden; }
+    .CodeMirror { height:320px; }
+    pre.console { background:#000; color:#8fff73; padding:10px; height:140px; overflow:auto; border-radius:.5rem; }
     #pixiContainer canvas { width:100% !important; height:320px !important; display:block; }
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen p-6">
 
   <div class="max-w-6xl mx-auto">
-    <header class="mb-6">
-      <h1 class="text-2xl font-bold">🎮 TinyGameLang — محرر + عرض (PixiJS)</h1>
-      <p class="text-sm text-gray-600">نسخة تعمل محليًا و على GitHub Pages — محرر CodeMirror 5 + PixiJS + حفظ تلقائي + تصدير/استيراد أمثلة.</p>
-    </header>
+    <h1 class="text-2xl font-bold mb-2">🎮 TinyGameLang — محرر + عرض (PixiJS)</h1>
+    <p class="text-gray-600 mb-6 text-sm">إصدار ثابت يعمل على GitHub Pages — CodeMirror 5 + PixiJS v6.5.8.</p>
 
-    <main class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <!-- المحرر والخيارات -->
-      <section class="space-y-4">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- محرر -->
+      <section class="space-y-3">
         <div class="bg-white p-4 rounded-2xl shadow">
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <h2 class="font-semibold">المحرر</h2>
-              <p class="text-xs text-gray-500">حرر كود TinyGameLang ثم اضغط تشغيل</p>
-            </div>
-
+          <div class="flex justify-between items-center mb-2">
+            <h2 class="font-semibold">المحرر</h2>
             <div class="flex gap-2">
-              <button id="runBtn" class="px-3 py-1 bg-green-600 text-white rounded">تشغيل</button>
-              <button id="stopBtn" class="px-3 py-1 bg-red-500 text-white rounded">إيقاف</button>
-              <button id="saveBtn" class="px-3 py-1 bg-blue-600 text-white rounded">حفظ يدوي</button>
-              <button id="downloadBtn" class="px-3 py-1 bg-gray-200 rounded">تنزيل .tiny</button>
-              <label class="cursor-pointer px-3 py-1 bg-gray-200 rounded">
-                تحميل
-                <input id="uploadFile" type="file" accept=".tiny,.txt" class="hidden" />
-              </label>
+              <button id="runBtn" class="bg-green-600 text-white px-3 py-1 rounded">تشغيل</button>
+              <button id="stopBtn" class="bg-red-500 text-white px-3 py-1 rounded">إيقاف</button>
+              <button id="saveBtn" class="bg-blue-600 text-white px-3 py-1 rounded">حفظ</button>
             </div>
           </div>
-
-          <div class="mt-3 cm-wrap">
-            <!-- textarea will be converted to CodeMirror -->
-            <textarea id="codeArea" class="w-full h-full" spellcheck="false"></textarea>
-          </div>
-
-          <div class="mt-3 flex gap-2 items-center">
-            <select id="examples" class="px-3 py-1 rounded border">
-              <option value="">— اختر مثالاً —</option>
-              <option value="basic">مثال: حركة بسيطة</option>
-              <option value="background">مثال: خلفية ونص</option>
-              <option value="circle">مثال: دائرة متحركة</option>
-            </select>
-            <button id="loadExample" class="px-3 py-1 bg-indigo-600 text-white rounded">تحميل المثال</button>
-
-            <div class="mr-auto text-sm text-gray-500">الحفظ التلقائي يعمل كل 5 ثواني.</div>
+          <div class="cm-wrap">
+            <textarea id="codeArea"></textarea>
           </div>
         </div>
 
         <div class="bg-white p-4 rounded-2xl shadow">
-          <h3 class="font-medium">مخرجات / Console</h3>
-          <pre id="console" class="console mt-2">—</pre>
-          <div class="mt-3 text-xs text-gray-500">أخطاء زمن التشغيل والرسائل ستظهر هنا.</div>
-        </div>
-
-        <div class="bg-white p-4 rounded-2xl shadow">
-          <h3 class="font-medium">قواعد مختصرة للـ TinyGameLang</h3>
-          <ul class="list-disc pr-5 mt-2 text-sm leading-7">
-            <li><code>player at X Y</code> — ضع اللاعب عند الإحداثيات</li>
-            <li><code>color player NAME</code> — لون اللاعب (اسم أو #hex)</li>
-            <li><code>rect player W H</code> — حجم المستطيل</li>
-            <li><code>circle player R</code> — دائرة بنصف قطر R</li>
-            <li><code>move player DX DY</code> — تحريك اللاعب</li>
-            <li><code>loop N ... end</code> — كرر الأوامر داخل الحلقة N مرة</li>
-            <li><code>background COLOR</code> — غيّر لون الخلفية</li>
-            <li><code>say "text"</code> — عرض نص فوق اللاعب</li>
-          </ul>
+          <h3 class="font-semibold mb-2">مخرجات / Console</h3>
+          <pre id="console" class="console">—</pre>
         </div>
       </section>
 
-      <!-- المعاينة والخيارات البصرية -->
-      <section class="space-y-4">
-        <div class="bg-white p-4 rounded-2xl shadow">
-          <div class="flex items-center justify-between">
-            <h2 class="font-semibold">المعاينة (PixiJS)</h2>
-            <div class="flex gap-2 items-center">
-              <label class="flex items-center gap-2 text-sm">
-                حجم العرض
-                <select id="sizeSelect" class="px-2 py-1 rounded border">
-                  <option value="480x320">480×320</option>
-                  <option value="640x360">640×360</option>
-                  <option value="800x450">800×450</option>
-                </select>
-              </label>
-              <label class="flex items-center gap-2 text-sm">
-                FPS:
-                <span id="fps" class="ml-2 text-xs text-gray-500">—</span>
-              </label>
-            </div>
-          </div>
-
-          <div id="stageWrap" class="mt-3 border border-gray-200 rounded overflow-hidden" style="background:#ffffff">
-            <div id="pixiContainer" style="width:100%;height:320px"></div>
-          </div>
-        </div>
-
-        <div class="bg-white p-4 rounded-2xl shadow">
-          <h3 class="font-medium">خيارات متقدمة</h3>
-          <div class="mt-3 grid grid-cols-2 gap-3">
-            <label class="flex items-center gap-2"><input id="autoSaveToggle" type="checkbox" checked/> حفظ تلقائي</label>
-            <label class="flex items-center gap-2">سرعة التنفيذ: <input id="speedRange" type="range" min="0.2" max="4" value="1" step="0.1" /></label>
-            <label class="flex items-center gap-2">تصفير الكونسول <button id="clearConsole" class="px-2 py-1 bg-gray-200 rounded">مسح</button></label>
-            <div></div>
-          </div>
-        </div>
-
-        <div class="bg-white p-4 rounded-2xl shadow text-sm text-gray-600">
-          <strong>ملاحظة نشر:</strong> ضع الملف على مستودع وفعّل Pages (الفرع main، المصدر /) وسيعمل مباشرة.
-        </div>
+      <!-- العرض -->
+      <section class="bg-white p-4 rounded-2xl shadow">
+        <h2 class="font-semibold mb-2">المعاينة (PixiJS)</h2>
+        <div id="pixiContainer" class="border rounded overflow-hidden" style="height:320px;"></div>
       </section>
-    </main>
+    </div>
   </div>
 
-  <!-- --------- Script logic (no modules) ---------- -->
-  <script>
-    // ========== Init CodeMirror 5 ==========
-    const defaultCode = `// مثال موسّع: TinyGameLang
-background #222
+<script>
+  // ========== CodeMirror ==========
+  const ta = document.getElementById('codeArea');
+  ta.value = localStorage.getItem('tiny.code') || 
+`background #222
 player at 50 140
 color player cyan
 rect player 24 24
 say "مرحباً!"
 loop 120
   move player 2 0
-end
-`;
-    // textarea fallback content
-    const ta = document.getElementById('codeArea');
-    ta.value = localStorage.getItem('tiny.code') || defaultCode;
+end`;
+  const editor = CodeMirror.fromTextArea(ta, { mode:"javascript", lineNumbers:true, theme:"eclipse" });
+  function getCode(){return editor.getValue();}
 
-    const editor = CodeMirror.fromTextArea(ta, {
-      mode: "javascript",   // use javascript mode for basic highlighting
-      theme: "eclipse",
-      lineNumbers: true,
-      indentUnit: 2,
-      tabSize: 2,
-      smartIndent: true,
-      autofocus: true
-    });
+  // ========== Console ==========
+  const log = msg => { 
+    const c = document.getElementById('console');
+    c.textContent += "\\n" + msg;
+    c.scrollTop = c.scrollHeight;
+  };
 
-    // helper API
-    function getCode() { return editor.getValue(); }
-    function setCode(txt) { editor.setValue(txt); }
+  // ========== Pixi ==========
+  let app = null;
+  let runtime = { running:false, speed:1 };
 
-    // ========== DOM refs ==========
-    const runBtn = document.getElementById('runBtn');
-    const stopBtn = document.getElementById('stopBtn');
-    const saveBtn = document.getElementById('saveBtn');
-    const downloadBtn = document.getElementById('downloadBtn');
-    const uploadFile = document.getElementById('uploadFile');
-    const loadExampleBtn = document.getElementById('loadExample');
-    const examplesSelect = document.getElementById('examples');
-    const consoleEl = document.getElementById('console');
-    const autoSaveToggle = document.getElementById('autoSaveToggle');
-    const sizeSelect = document.getElementById('sizeSelect');
-    const pixiContainer = document.getElementById('pixiContainer');
-    const fpsEl = document.getElementById('fps');
-    const clearConsoleBtn = document.getElementById('clearConsole');
-    const speedRange = document.getElementById('speedRange');
-
-    // ========== Examples ==========
-    const examples = {
-      basic: `// حركة بسيطة
-background #111
-player at 50 140
-color player orange
-rect player 24 24
-loop 200
-  move player 3 0
-end
-`,
-      background: `background blue
-player at 20 40
-color player white
-rect player 24 24
-say "خلفية زرقاء"
-loop 120
-  move player 2 0
-end
-`,
-      circle: `background #0b0b0b
-player at 100 150
-color player #f0f
-circle player 16
-loop 180
-  move player 2 0
-end
-`
-    };
-
-    loadExampleBtn.addEventListener('click', () => {
-      const k = examplesSelect.value;
-      if (!k) return alert('اختر مثالاً');
-      setCode(examples[k] || '');
-    });
-
-    // ========== Save / Load functionality ==========
-    saveBtn.addEventListener('click', () => {
-      localStorage.setItem('tiny.code', getCode());
-      logConsole('تم الحفظ محلياً');
-    });
-
-    // auto-save every 5s if enabled
-    setInterval(() => {
-      if (autoSaveToggle.checked) {
-        try { localStorage.setItem('tiny.code', getCode()); }
-        catch(e) { /* ignore storage errors */ }
-      }
-    }, 5000);
-
-    uploadFile.addEventListener('change', (ev) => {
-      const f = ev.target.files && ev.target.files[0];
-      if (!f) return;
-      const r = new FileReader();
-      r.onload = () => { setCode(String(r.result)); };
-      r.readAsText(f);
-    });
-
-    downloadBtn.addEventListener('click', () => {
-      const code = getCode();
-      const blob = new Blob([code], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'project.tiny';
-      document.body.appendChild(a); a.click(); a.remove();
-      URL.revokeObjectURL(url);
-    });
-
-    clearConsoleBtn.addEventListener('click', () => { consoleEl.textContent = ''; });
-
-    function logConsole(msg) {
-      consoleEl.textContent += msg + '\\n';
-      consoleEl.scrollTop = consoleEl.scrollHeight;
+  function createPixi(w=480,h=320) {
+    // تنظيف آمن لأي تطبيق سابق
+    if (app) {
+      try { app.ticker.stop(); } catch(e){}
+      try { app.stage.removeChildren(); } catch(e){}
+      try { if (app.renderer && app.renderer.destroy) app.renderer.destroy(true); } catch(e){}
+      try { if (app.view && app.view.parentNode) app.view.parentNode.removeChild(app.view); } catch(e){}
+      app = null;
+      document.getElementById('pixiContainer').innerHTML = '';
     }
 
-    // ========== TinyGameLang parser (light) ==========
-    function parseTiny(src) {
-      const lines = src.split(/\\r?\\n/);
-      const root = [];
-      const stack = [];
-      for (let raw of lines) {
-        const line = raw.trim();
-        if (!line || line.startsWith('//')) continue;
-        const sayMatch = line.match(/^say\\s+"(.*)"$/i);
-        if (sayMatch) {
-          const node = { t: 'say', text: sayMatch[1] };
-          addNode(node);
-          continue;
-        }
-        const parts = line.split(/\\s+/);
-        const first = parts[0].toLowerCase();
-        if (first === 'loop') {
-          const n = Number(parts[1]) || 0;
-          const node = { t: 'loop', n, body: [] };
-          addNode(node);
-          stack.push(node);
-          continue;
-        }
-        if (first === 'end') {
-          stack.pop();
-          continue;
-        }
-        // other nodes
-        let node = null;
-        if (first === 'background') node = { t: 'background', color: parts[1] };
-        else if (first === 'player' && parts[1] === 'at') node = { t: 'player_at', x: Number(parts[2]) || 0, y: Number(parts[3]) || 0 };
-        else if (first === 'color' && parts[1] === 'player') node = { t: 'color_player', color: parts[2] };
-        else if (first === 'rect' && parts[1] === 'player') node = { t: 'rect_player', w: Number(parts[2]) || 24, h: Number(parts[3]) || 24 };
-        else if (first === 'circle' && parts[1] === 'player') node = { t: 'circle_player', r: Number(parts[2]) || 8 };
-        else if (first === 'move' && parts[1] === 'player') node = { t: 'move_player', dx: Number(parts[2]) || 0, dy: Number(parts[3]) || 0 };
-        else node = { t: 'unknown', raw: line };
+    app = new PIXI.Application({ width:w, height:h, backgroundColor:0x000000, resolution:1 });
+    document.getElementById('pixiContainer').appendChild(app.view);
+    return app;
+  }
 
-        addNode(node);
-      }
+  function colorToHex(c){
+    if(!c) return 0xffffff;
+    if(c.startsWith('#')) return parseInt(c.slice(1),16);
+    const map={red:0xff0000,green:0x00ff00,blue:0x0000ff,white:0xffffff,black:0x000000,cyan:0x00ffff,orange:0xffa500,yellow:0xffff00,magenta:0xff00ff,gray:0x808080};
+    return map[c.toLowerCase()]||0xffffff;
+  }
 
-      function addNode(node) {
-        if (stack.length > 0) stack[stack.length - 1].body.push(node);
-        else root.push(node);
-      }
-
-      return root;
+  function parseTiny(src){
+    const lines=src.split(/\\r?\\n/),root=[],stack=[];
+    const add=n=>stack.length?stack[stack.length-1].body.push(n):root.push(n);
+    for(const raw of lines){
+      const line=raw.trim(); if(!line||line.startsWith('//'))continue;
+      const say=line.match(/^say\\s+"(.*)"$/i); if(say){add({t:'say',text:say[1]});continue;}
+      const p=line.split(/\\s+/),f=p[0].toLowerCase();
+      if(f==='loop'){add({t:'loop',n:+p[1]||0,body:[]});stack.push(root[root.length-1]);continue;}
+      if(f==='end'){stack.pop();continue;}
+      let n=null;
+      if(f==='background') n={t:'background',color:p[1]};
+      else if(f==='player'&&p[1]==='at') n={t:'player_at',x:+p[2],y:+p[3]};
+      else if(f==='color'&&p[1]==='player') n={t:'color_player',color:p[2]};
+      else if(f==='rect'&&p[1]==='player') n={t:'rect_player',w:+p[2],h:+p[3]};
+      else if(f==='circle'&&p[1]==='player') n={t:'circle_player',r:+p[2]};
+      else if(f==='move'&&p[1]==='player') n={t:'move_player',dx:+p[2],dy:+p[3]};
+      else n={t:'unknown',raw:line};
+      add(n);
     }
+    return root;
+  }
 
-    // flatten into frames
-    function flattenCommands(cmds) {
-      const frames = [];
-      function push(list) {
-        for (const n of list) {
-          if (n.t === 'loop') {
-            for (let i=0;i<n.n;i++) push(n.body);
-          } else frames.push(n);
-        }
+  function flatten(cmds){const out=[];(function push(arr){for(const n of arr){if(n.t==='loop')for(let i=0;i<n.n;i++)push(n.body);else out.push(n);}})(cmds);return out;}
+
+  function startRuntime(code){
+    const ast=parseTiny(code),frames=flatten(ast);
+    createPixi();
+    const stage=app.stage,player={g:new PIXI.Graphics(),x:0,y:0,w:24,h:24,r:null,color:0xffffff};
+    stage.addChild(player.g);
+    let bg=0x000000,pc=0;
+    const texts=[];
+    function drawPlayer(){
+      player.g.clear().beginFill(player.color);
+      if(player.r) player.g.drawCircle(player.x+player.r,player.y+player.r,player.r);
+      else player.g.drawRect(player.x,player.y,player.w,player.h);
+      player.g.endFill();
+    }
+    function apply(n){
+      switch(n.t){
+        case'background':bg=colorToHex(n.color);app.renderer.backgroundColor=bg;break;
+        case'player_at':player.x=n.x;player.y=n.y;break;
+        case'color_player':player.color=colorToHex(n.color);break;
+        case'rect_player':player.w=n.w;player.h=n.h;player.r=null;break;
+        case'circle_player':player.r=n.r;player.w=n.r*2;player.h=n.r*2;break;
+        case'move_player':player.x+=n.dx;player.y+=n.dy;break;
+        case'say':const t=new PIXI.Text(n.text,{fill:0xffffff,fontSize:14});t.x=player.x;t.y=player.y-30;stage.addChild(t);texts.push({t,ttl:100});break;
       }
-      push(cmds);
-      return frames;
     }
-
-    // ========== Pixi runtime ==========
-    let app = null;
-    let runtime = { running:false, speed:1 };
-
-    function createPixi(w=480,h=320) {
-      if (app) {
-        app.destroy(true, { children: true });
-        app = null;
-        pixiContainer.innerHTML = '';
-      }
-      app = new PIXI.Application({ width:w, height:h, backgroundColor: 0x000000, resolution: window.devicePixelRatio || 1, autoDensity: true });
-      pixiContainer.appendChild(app.view);
-      app.renderer.view.style.width = '100%';
-      app.renderer.view.style.height = '320px';
-      return app;
-    }
-
-    function colorToHex(c) {
-      if (!c) return 0xffffff;
-      if (c.startsWith('#')) return parseInt(c.slice(1),16);
-      const map = { red:0xff0000, green:0x00ff00, blue:0x0000ff, white:0xffffff, black:0x000000, cyan:0x00ffff, orange:0xffa500, yellow:0xffff00, magenta:0xff00ff, gray:0x808080, blueviolet:0x8a2be2 };
-      return map[c.toLowerCase()] || 0xffffff;
-    }
-
-    function startRuntime(code) {
-      const ast = parseTiny(code);
-      const size = sizeSelect.value.split('x').map(Number);
-      createPixi(size[0], size[1]);
-
-      const stage = app.stage;
-      const player = { g: new PIXI.Graphics(), x:0, y:0, w:24, h:24, r:null, color:0xffffff };
-      stage.addChild(player.g);
-
-      const texts = [];
-      let bg = 0x000000;
-      app.renderer.backgroundColor = bg;
-
-      const frames = flattenCommands(ast);
-      let pc = 0;
-
-      function applyNode(node) {
-        switch (node.t) {
-          case 'background':
-            bg = colorToHex(node.color); app.renderer.backgroundColor = bg; break;
-          case 'player_at':
-            player.x = node.x; player.y = node.y; break;
-          case 'color_player':
-            player.color = colorToHex(node.color); break;
-          case 'rect_player':
-            player.w = node.w; player.h = node.h; player.r = null; break;
-          case 'circle_player':
-            player.r = node.r; if (player.r) { player.w = player.h = player.r*2; } break;
-          case 'move_player':
-            player.x += node.dx * runtime.speed; player.y += node.dy * runtime.speed; break;
-          case 'say':
-            const t = new PIXI.Text(node.text, { fontSize: 16, fill: 0xffffff });
-            t.x = player.x; t.y = player.y - 30; stage.addChild(t); texts.push({ obj: t, ttl: 120 }); break;
-          case 'unknown':
-            logConsole('تعذر تنفيذ: ' + node.raw); break;
-        }
-      }
-
-      runtime.running = true;
-      let last = performance.now();
-      let fc = 0, ft = 0;
-
-      app.ticker.add(() => {
-        if (!runtime.running) return;
-        const now = performance.now(); const dt = now - last; last = now;
-
-        // execute a few nodes per tick (depends on speed)
-        const perTick = Math.max(1, Math.round(runtime.speed));
-        for (let k=0;k<perTick;k++) {
-          if (pc >= frames.length) break;
-          applyNode(frames[pc++]);
-        }
-
-        // draw player
-        player.g.clear(); player.g.beginFill(player.color || 0xffffff);
-        if (player.r) player.g.drawCircle(player.x + player.r, player.y + player.r, player.r);
-        else player.g.drawRect(player.x, player.y, player.w, player.h);
-        player.g.endFill();
-
-        // update texts
-        for (let i=texts.length-1;i>=0;i--) {
-          texts[i].ttl--; texts[i].obj.x = player.x; texts[i].obj.y = player.y - 30;
-          if (texts[i].ttl <= 0) { stage.removeChild(texts[i].obj); texts.splice(i,1); }
-        }
-
-        if (pc >= frames.length) {
-          runtime.running = false;
-          logConsole('انتهت التعليمات');
-        }
-
-        // fps
-        fc++; ft += dt;
-        if (ft >= 500) {
-          const fps = Math.round((fc/ft)*1000);
-          fpsEl.textContent = fps + ' fps';
-          fc = 0; ft = 0;
-        }
-      });
-
-      logConsole('بدء التشغيل — ' + frames.length + ' عملية');
-    }
-
-    function stopRuntime() {
-      runtime.running = false;
-      if (app && app.ticker) {
-        // don't destroy canvas, just stop performing changes
-      }
-      logConsole('أُوقف التنفيذ');
-    }
-
-    // ========== Buttons wiring ==========
-    runBtn.addEventListener('click', () => {
-      stopRuntime();
-      consoleEl.textContent = '';
-      try {
-        startRuntime(getCode());
-      } catch (e) { logConsole('خطأ: ' + e.message); }
+    runtime.running=true;
+    app.ticker.add(()=>{
+      if(!runtime.running)return;
+      if(pc<frames.length){apply(frames[pc++]);drawPlayer();}
+      for(let i=texts.length-1;i>=0;i--){texts[i].ttl--;texts[i].t.x=player.x;texts[i].t.y=player.y-30;if(texts[i].ttl<=0){stage.removeChild(texts[i].t);texts.splice(i,1);}}
+      if(pc>=frames.length){runtime.running=false;log('انتهت التعليمات');}
     });
+    log('تشغيل ' + frames.length + ' أمر.');
+  }
 
-    stopBtn.addEventListener('click', () => { stopRuntime(); });
+  function stopRuntime(){runtime.running=false;log('تم الإيقاف.');}
 
-    // resize stage on change
-    sizeSelect.addEventListener('change', () => {
-      const s = sizeSelect.value.split('x').map(Number);
-      if (app) app.renderer.resize(s[0], s[1]);
-    });
+  // ========== أزرار ==========
+  document.getElementById('runBtn').onclick=()=>{stopRuntime();document.getElementById('console').textContent='';startRuntime(getCode());};
+  document.getElementById('stopBtn').onclick=()=>stopRuntime();
+  document.getElementById('saveBtn').onclick=()=>{localStorage.setItem('tiny.code',getCode());log('تم الحفظ.');};
 
-    // speed slider
-    speedRange.addEventListener('input', () => { runtime.speed = Number(speedRange.value); });
-
-    // on load: ensure editor has initial value
-    (function init() {
-      if (!localStorage.getItem('tiny.code')) {
-        setCode(defaultCode);
-      }
-      logConsole('جاهز — عدّل الكود واضغط تشغيل');
-    })();
-
-    // Make editor focusable quickly
-    editor.focus();
-  </script>
+  log('جاهز — عدّل الكود واضغط تشغيل 🎯');
+</script>
 </body>
 </html>
