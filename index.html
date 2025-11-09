@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="ar">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>محرك TinyGameLang</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f7f7f7;
+      margin: 0;
+      padding: 1em;
+      direction: rtl;
+    }
+    .container {max-width: 1000px; margin:auto; display:grid; grid-template-columns:1fr 1fr; gap:1em;}
+    textarea {width:100%; height:300px; font-family:monospace; font-size:14px;}
+    button {padding:6px 16px; margin-top:6px;}
+    iframe {width:100%; height:300px; border:1px solid #ccc; border-radius:8px;}
+    pre {background:#000; color:#0f0; padding:8px; height:100px; overflow:auto;}
+  </style>
+</head>
+<body>
+  <h1>🎮 محرك الألعاب TinyGameLang</h1>
+  <div class="container">
+    <div>
+      <label>الكود:</label>
+      <textarea id="code">// مثال
+player at 50 50
+color player red
+rect player 20 20
+loop 60
+  move player 2 0
+end</textarea>
+      <br/>
+      <button id="run">تشغيل</button>
+    </div>
+    <div>
+      <label>المعاينة:</label>
+      <iframe id="preview"></iframe>
+      <pre id="console">—</pre>
+    </div>
+  </div>
+
+  <script>
+    function compileTinyGameLang(src) {
+      const lines = src.split(/\\r?\\n/).map(l => l.trim());
+      const out = [];
+      out.push(`(function(runtime){`);
+      out.push(`const p = runtime.player;`);
+      let i=0;
+      while(i<lines.length){
+        const line = lines[i++];
+        if(!line || line.startsWith('//')) continue;
+        const parts=line.split(/\\s+/);
+        if(parts[0]==='player' && parts[1]==='at'){
+          out.push(`p.x=${+parts[2]}; p.y=${+parts[3]};`);
+        } else if(parts[0]==='color' && parts[1]==='player'){
+          out.push(`p.color='${parts[2]}';`);
+        } else if(parts[0]==='rect' && parts[1]==='player'){
+          out.push(`p.w=${+parts[2]}; p.h=${+parts[3]};`);
+        } else if(parts[0]==='move' && parts[1]==='player'){
+          out.push(`p.x+=${+parts[2]}; p.y+=${+parts[3]};`);
+        } else if(parts[0]==='loop'){
+          const n=+parts[1]||1; out.push(`for(let __i=0;__i<${n};__i++){`);
+        } else if(parts[0]==='end'){
+          out.push(`}`);
+        }
+      }
+      out.push(`runtime.draw();`);
+      out.push(`})(window.__TinyRuntime);`);
+      return out.join('\\n');
+    }
+
+    function buildRuntimeHtml(compiledJs){
+      return `<!doctype html>
+<html><body style='margin:0;overflow:hidden'>
+<canvas id='screen' width='480' height='320'></canvas>
+<script>
+window.__TinyRuntime={
+  player:{x:0,y:0,w:16,h:16,color:'black'},
+  ctx:document.getElementById('screen').getContext('2d'),
+  draw:function(){
+    const ctx=this.ctx;
+    ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+    ctx.fillStyle=this.player.color;
+    ctx.fillRect(this.player.x,this.player.y,this.player.w,this.player.h);
+  }
+};
+try{${compiledJs}}catch(e){
+  parent.postMessage({type:'runtime-error',message:e.message},'*');
+}
+parent.postMessage({type:'runtime-done'},'*');
+<\/script></body></html>`;
+    }
+
+    const runBtn = document.getElementById('run');
+    const codeEl = document.getElementById('code');
+    const preview = document.getElementById('preview');
+    const consoleOut = document.getElementById('console');
+
+    runBtn.onclick = () => {
+      consoleOut.textContent = '';
+      try {
+        const compiled = compileTinyGameLang(codeEl.value);
+        const html = buildRuntimeHtml(compiled);
+        const blob = new Blob([html], {type:'text/html'});
+        preview.src = URL.createObjectURL(blob);
+      } catch (e){
+        consoleOut.textContent = 'خطأ في الترجمة: ' + e.message;
+      }
+    };
+
+    window.addEventListener('message', e=>{
+      if(e.data.type==='runtime-error')
+        consoleOut.textContent += '\\nRuntime: '+e.data.message;
+      if(e.data.type==='runtime-done')
+        consoleOut.textContent += '\\nانتهى';
+    });
+  </script>
+</body>
+</html>
